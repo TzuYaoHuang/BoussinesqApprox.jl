@@ -1,9 +1,13 @@
 name = "BoussinesqApprox"
 uuid = "19c2a1cc-c6f2-4b31-93b4-57d007c108af"
-authors = ["Tzu-Yao Huang <tzuyao.jason.huang@gmail.com>"]
 version = "1.0.0-DEV"
+authors = ["Tzu-Yao Huang <tzuyao.jason.huang@gmail.com>"]
+
+[deps]
+WaterLily = "ed894a53-35f9-47f1-b17f-85db9237eebd"
 
 [compat]
+WaterLily = "1.8.0"
 julia = "1.12"
 
 [extras]
