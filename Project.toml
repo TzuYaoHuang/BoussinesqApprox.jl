@@ -1,0 +1,13 @@
+name = "BoussinesqApprox"
+uuid = "19c2a1cc-c6f2-4b31-93b4-57d007c108af"
+authors = ["Tzu-Yao Huang <tzuyao.jason.huang@gmail.com>"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.12"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
