@@ -1,5 +1,8 @@
 module BoussinesqApprox
 
-# Write your package code here.
+using WaterLily
+import WaterLily: δ, @loop
+
+include("Thermal.jl")
 
 end
