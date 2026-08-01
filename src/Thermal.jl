@@ -6,15 +6,19 @@ struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:Abstrac
     # Thermal fields
     Θ :: Sf   # Temprature field  (θ = T-T₀)
     θ⁰:: Sf   # previous temprature
-    Ψ :: Sf   # force vector    
+    Ψ :: Sf   # force vector
+
+    # Body fields
+    Λ :: Sf   # Body temperature field
+    ξ₀:: Sf   # zeroth moment on the collocated grid
 
     # Properties
     α :: T    # coefficient of thermal expansion
     κ :: T    # temperature diffusivity
     function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, α=0.001, κ=0.1, kwargs...) where D
         flow = Flow(N,uBC; kwargs...)
-        θ = zero(flow.σ); θ⁰= zero(flow.σ);
-        if isa(θ0, Function) 
+        θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ); ξ₀ = zero(flow.σ0)
+        if isa(θ0, Function)
             apply!(θ0, θ)
             BC!(θ,flow.perdir)
         end
@@ -60,14 +64,15 @@ accelerate!(r,t,g::Function,::Union{Nothing,Tuple},θ,α) = accelerate!(r,t,g,θ
 accelerate!(r,t,::Nothing,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->derivative(τ->U(i,x,τ),t),θ,α)
 accelerate!(r,t,g::Function,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->g(i,x,t)+derivative(τ->U(i,x,τ),t),θ,α)
 
-function BDIMΘ!(a::ThermalFlow)
+function BDIMΘ!(a::ThermalFlow{T},w=1) where T # include 0.5
+    wT = T(w)
     dt = a.Δt[end]
-    @loop a.Ψ[I]  = a.θ⁰[I]+dt*a.Ψ[I] over I in CartesianIndices(a.f)
-    @loop a.θ⁰[I] = a.Ψ[I] over I in CartesianIndices(a.f)
+    @loop a.Ψ[I] = a.θ⁰[I] + dt*a.Ψ[I] - a.Λ[I] over I in CartesianIndices(a.Ψ)
+    @loop a.θ[I] =(a.θ[I]  + a.Λ[I]  + a.ξ₀[I]*a.Ψ[I])*wT over I in CartesianIndices(a.Ψ)
 end
 
 function mom_predict!(a::ThermalFlow, t₀, t₁; udf=nothing, kwargs...)
-    a.θ⁰ .= a.θ
+    a.θ⁰ .= a.θ; fill!(a.θ, 0)
     conv_diff!(a.f,a.u⁰,a.σ,a.λ;ν=a.ν,perdir=a.perdir)
     udf!(a,udf,a.u⁰,t₀; kwargs...) # advect with u⁰ (a.u is zeroed by scale_u!)
     # Thermal flow
@@ -86,4 +91,9 @@ function mom_correct!(a::ThermalFlow, t; udf=nothing, kwargs...)
     conv_diff!(a.Ψ,a.θ,a.u,a.σ,a.λ;κ=a.κ,perdir=a.perdir); BDIMΘ!(a); BC!(a.θ,a.perdir)
 
     BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t)
+end
+
+function CFL(a::ThermalFlow;Δt_max=10)
+    @inside a.σ[I] = flux_out(I,a.u)
+    min(Δt_max,inv(maximum(a.σ)+5*(a.ν+a.κ)))
 end

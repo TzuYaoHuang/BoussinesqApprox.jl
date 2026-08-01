@@ -1,7 +1,7 @@
 module BoussinesqApprox
 
 using WaterLily
-import WaterLily: δ, @loop
+import WaterLily: δ, @loop, CIj, slice, inside_u
 
 include("Thermal.jl")
 
