@@ -1,10 +1,10 @@
 
-import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!
+import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!
 
 struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:AbstractArray{T}, Lf} <: AbstractFlow{D,T}
     flow :: Flow{D,T}
     # Thermal fields
-    Θ :: Sf   # Temprature field  (θ = T-T₀)
+    θ :: Sf   # Temprature field  (θ = T-T₀)
     θ⁰:: Sf   # previous temprature
     Ψ :: Sf   # force vector
 
@@ -15,16 +15,21 @@ struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:Abstrac
     # Properties
     α :: T    # coefficient of thermal expansion
     κ :: T    # temperature diffusivity
-    function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, α=0.001, κ=0.1, kwargs...) where D
+    function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, θb=nothing, α=0.001, κ=0.1, kwargs...) where D
         flow = Flow(N,uBC; kwargs...)
-        θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ); ξ₀ = zero(flow.σ0)
+        θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ)
+        ξ₀ = zero(flow.σ); fill!(ξ₀,1)
         if isa(θ0, Function)
             apply!(θ0, θ)
             BC!(θ,flow.perdir)
         end
+        if isa(θb, Function)
+            apply!(θb, Λ)
+            BC!(Λ,flow.perdir)
+        end
         Ψ = zero(flow.σ)
 
-        new{D,T,typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Ψ,α,κ)
+        new{D,eltype(flow.p),typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Λ,ξ₀,Ψ,α,κ)
     end
 end
 Base.getproperty(f::ThermalFlow, s::Symbol) = s in propertynames(f) ? getfield(f, s) : getfield(f.flow, s)
@@ -96,4 +101,33 @@ end
 function CFL(a::ThermalFlow;Δt_max=10)
     @inside a.σ[I] = flux_out(I,a.u)
     min(Δt_max,inv(maximum(a.σ)+5*(a.ν+a.κ)))
+end
+
+using StaticArrays
+function measure!(a::ThermalFlow{N,T},body::AbstractBody;t=zero(T),ϵ=1) where {N,T}
+    a.V .= zero(T); a.μ₀ .= one(T); a.μ₁ .= zero(T); d²=T(2+ϵ)^2
+    measure_sdf!(a.σ, body, t; fastd²=d²) # measure separately to allow specialization
+    @fastmath @inline function fill!(μ₀,μ₁,ξ₀,V,d,I)
+        if d[I]^2<d²
+            for i ∈ 1:N
+                dᵢ,nᵢ,Vᵢ = measure(body,loc(i,I,T),t,fastd²=d²)
+                dᵢ = abs(dᵢ) ≤ 0.5 ? dᵢ : copysign(dᵢ,d[I]) # enforce sign consistency
+                V[I,i] = Vᵢ[i]
+                μ₀[I,i] = WaterLily.μ₀(dᵢ,ϵ)
+                for j ∈ 1:N
+                    μ₁[I,i,j] = WaterLily.μ₁(dᵢ,ϵ)*nᵢ[j]
+                end
+            end
+            ξ₀[I] = WaterLily.μ₀(d[I],ϵ)
+        elseif d[I]<zero(T)
+            for i ∈ 1:N
+                μ₀[I,i] = zero(T)
+            end
+            ξ₀[I] = zero(T)
+        end
+    end
+    @loop fill!(a.μ₀,a.μ₁,a.ξ₀,a.V,a.σ,I) over I ∈ inside(a.p)
+    BC!(a.μ₀,zeros(SVector{N,T}),false,a.perdir) # BC on μ₀, don't fill normal component yet
+    BC!(a.ξ₀,a.perdir)
+    BC!(a.V ,zeros(SVector{N,T}),a.exitBC,a.perdir)
 end
