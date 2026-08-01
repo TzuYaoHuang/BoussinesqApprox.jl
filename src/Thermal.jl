@@ -1,22 +1,32 @@
 
-import WaterLily: ∂,ϕu,ϕuL,ϕuR,ϕuP
+import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!
 
-struct Thermal{D, T, Sf<:AbstractArray{T}, Lf}
+struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:AbstractArray{T}, Lf} <: AbstractFlow{D,T}
+    flow :: Flow{D,T}
     # Thermal fields
     Θ :: Sf   # Temprature field  (θ = T-T₀)
     θ⁰:: Sf   # previous temprature
-    f :: Sf   # force vector    
+    Ψ :: Sf   # force vector    
 
     # Properties
     α :: T    # coefficient of thermal expansion
     κ :: T    # temperature diffusivity
+    function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, α=0.001, κ=0.1, kwargs...) where D
+        flow = Flow(N,uBC; kwargs...)
+        θ = zero(flow.σ); θ⁰= zero(flow.σ);
+        if isa(θ0, Function) 
+            apply!(θ0, θ)
+            BC!(θ,flow.perdir)
+        end
+        Ψ = zero(flow.σ)
 
-    perdir :: NTuple # tuple of periodic direction
-    λ :: Lf # convective scheme λ(u,c,d); a type parameter so conv_diff!'s kernel specializes on it
-    function Thermal()
+        new{D,T,typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Ψ,α,κ)
     end
 end
+Base.getproperty(f::ThermalFlow, s::Symbol) = s in propertynames(f) ? getfield(f, s) : getfield(f.flow, s)
+Base.setproperty!(f::ThermalFlow, s::Symbol, x) = s in propertynames(f) ? setproperty!(f,s,x) : setproperty!(f.flow,s,x)
 
+# ∂ₜθ = -∂ⱼuⱼθ + κ∂ⱼⱼθ
 function conv_diff!(r::AbstractArray{T,n},θ,u,Φ,λ::F; κ=0.1,perdir=()) where {T,n,F}
     fill!(r,0)
     N = size(r)
@@ -42,3 +52,38 @@ upperBoundary!(r,θ,u,Φ,κ,j,N,λ,::Val{false}) = @loop r[I-δ(j,I)] += -ϕuR(j
 lowerBoundary!(r,θ,u,Φ,κ,j,N,λ,::Val{true}) = @loop (
     Φ[I] = ϕuP(j,CIj(j,I,N[j]-2),I,θ,u[I,j],λ) -κ*∂(j,I,θ); r[I] += Φ[I]) over I ∈ slice(N,2,j,2)
 upperBoundary!(r,θ,u,Φ,κ,j,N,λ,::Val{true}) = @loop r[I-δ(j,I)] -= Φ[CIj(j,I,2)] over I ∈ slice(N,N[j],j,2)
+
+
+accelerate!(r,t,::Nothing,::Union{Nothing,Tuple},θ,α) = nothing
+accelerate!(r,t,f::Function,θ,α) = @loop r[Ii] += f(last(Ii),loc(Ii,eltype(r)),t)*(1-α*ϕ(last(Ii),CI(Base.front(Ii)),θ)) over Ii ∈ CartesianIndices(r)
+accelerate!(r,t,g::Function,::Union{Nothing,Tuple},θ,α) = accelerate!(r,t,g,θ,α)
+accelerate!(r,t,::Nothing,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->derivative(τ->U(i,x,τ),t),θ,α)
+accelerate!(r,t,g::Function,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->g(i,x,t)+derivative(τ->U(i,x,τ),t),θ,α)
+
+function BDIMΘ!(a::ThermalFlow)
+    dt = a.Δt[end]
+    @loop a.Ψ[I]  = a.θ⁰[I]+dt*a.Ψ[I] over I in CartesianIndices(a.f)
+    @loop a.θ⁰[I] = a.Ψ[I] over I in CartesianIndices(a.f)
+end
+
+function mom_predict!(a::ThermalFlow, t₀, t₁; udf=nothing, kwargs...)
+    a.θ⁰ .= a.θ
+    conv_diff!(a.f,a.u⁰,a.σ,a.λ;ν=a.ν,perdir=a.perdir)
+    udf!(a,udf,a.u⁰,t₀; kwargs...) # advect with u⁰ (a.u is zeroed by scale_u!)
+    # Thermal flow
+    accelerate!(a.f,t₀,a.g,a.uBC,a.θ⁰,a.α)
+    conv_diff!(a.Ψ,a.θ⁰,a.u⁰,a.σ,a.λ;κ=a.κ,perdir=a.perdir); BDIMΘ!(a); BC!(a.θ,a.perdir)
+
+    BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # BC MUST be at t₁
+    a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end]) # convective exit
+end
+
+function mom_correct!(a::ThermalFlow, t; udf=nothing, kwargs...)
+    conv_diff!(a.f,a.u,a.σ,a.λ;ν=a.ν,perdir=a.perdir)
+    udf!(a,udf,a.u,t; kwargs...) # advect with projected a.u
+    # Thermal flow
+    accelerate!(a.f,t,a.g,a.uBC,a.θ,a.α)
+    conv_diff!(a.Ψ,a.θ,a.u,a.σ,a.λ;κ=a.κ,perdir=a.perdir); BDIMΘ!(a); BC!(a.θ,a.perdir)
+
+    BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t)
+end
