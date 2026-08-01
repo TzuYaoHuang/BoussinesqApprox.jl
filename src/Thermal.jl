@@ -1,5 +1,5 @@
 
-import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!
+import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!,udf!
 
 struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:AbstractArray{T}, Lf} <: AbstractFlow{D,T}
     flow :: Flow{D,T}
@@ -69,7 +69,7 @@ accelerate!(r,t,g::Function,::Union{Nothing,Tuple},θ,α) = accelerate!(r,t,g,θ
 accelerate!(r,t,::Nothing,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->derivative(τ->U(i,x,τ),t),θ,α)
 accelerate!(r,t,g::Function,U::Function,θ,α) = accelerate!(r,t,(i,x,t)->g(i,x,t)+derivative(τ->U(i,x,τ),t),θ,α)
 
-function BDIMΘ!(a::ThermalFlow{T},w=1) where T # include 0.5
+function BDIMΘ!(a::ThermalFlow{n,T},w=1) where {n,T} # include 0.5
     wT = T(w)
     dt = a.Δt[end]
     @loop a.Ψ[I] = a.θ⁰[I] + dt*a.Ψ[I] - a.Λ[I] over I in CartesianIndices(a.Ψ)

@@ -15,9 +15,14 @@ function hot_circle(N;Ra=10^6,ε=0.001,Pr=10,mem=Array,T=Float32)
     ν = sqrt(νκ*Pr)
     κ = sqrt(νκ/Pr)
 
-    Simulation(NN, (0,0), radius; Δt=0.05, ν, κ, flow_ctor=ThermalFlow, g=(i,x,t)->g, perdir=(1,),θ0=nothing,θb=(x)->ΔT, body)
+    Uf = sqrt(g*α*ΔT*radius)
+    U = Uf/√Pr |> T
+
+    Simulation(NN, (0,0), radius; U, Δt=0.05, ν, κ, flow_ctor=ThermalFlow, g=(i,x,t)->g, perdir=(1,),θ0=nothing,θb=(x)->ΔT, body)
 end
 
 sim = hot_circle(64)
+
+sim_step!(sim)
 
 heatmap(sim.flow.θ',aspect_ratio=:equal)
