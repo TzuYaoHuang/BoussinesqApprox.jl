@@ -1,5 +1,6 @@
 
-import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!,udf!
+import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!,udf!,
+                  BDIM!,scale_u!,exitBC!,flux_out
 
 struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:AbstractArray{T}, Lf} <: AbstractFlow{D,T}
     flow :: Flow{D,T}
@@ -29,7 +30,7 @@ struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:Abstrac
         end
         Ψ = zero(flow.σ)
 
-        new{D,eltype(flow.p),typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Λ,ξ₀,Ψ,α,κ)
+        new{D,eltype(flow.p),typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
     end
 end
 Base.getproperty(f::ThermalFlow, s::Symbol) = s in propertynames(f) ? getfield(f, s) : getfield(f.flow, s)
@@ -93,7 +94,7 @@ function mom_correct!(a::ThermalFlow, t; udf=nothing, kwargs...)
     udf!(a,udf,a.u,t; kwargs...) # advect with projected a.u
     # Thermal flow
     accelerate!(a.f,t,a.g,a.uBC,a.θ,a.α)
-    conv_diff!(a.Ψ,a.θ,a.u,a.σ,a.λ;κ=a.κ,perdir=a.perdir); BDIMΘ!(a); BC!(a.θ,a.perdir)
+    conv_diff!(a.Ψ,a.θ,a.u,a.σ,a.λ;κ=a.κ,perdir=a.perdir); BDIMΘ!(a,0.5); BC!(a.θ,a.perdir)
 
     BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t)
 end
