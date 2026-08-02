@@ -6,5 +6,6 @@ Manifest.toml
 
 *.png
 *.gif
+!assets/HotColdCylinder.gif
 
 .vscode
