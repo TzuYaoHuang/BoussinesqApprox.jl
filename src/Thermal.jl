@@ -104,31 +104,8 @@ function CFL(a::ThermalFlow;Δt_max=10)
     min(Δt_max,inv(maximum(a.σ)+5*(a.ν+a.κ)))
 end
 
-using StaticArrays
 function measure!(a::ThermalFlow{N,T},body::AbstractBody;t=zero(T),ϵ=1) where {N,T}
-    a.V .= zero(T); a.μ₀ .= one(T); a.μ₁ .= zero(T); d²=T(2+ϵ)^2
-    measure_sdf!(a.σ, body, t; fastd²=d²) # measure separately to allow specialization
-    @fastmath @inline function fill!(μ₀,μ₁,ξ₀,V,d,I)
-        if d[I]^2<d²
-            for i ∈ 1:N
-                dᵢ,nᵢ,Vᵢ = measure(body,loc(i,I,T),t,fastd²=d²)
-                dᵢ = abs(dᵢ) ≤ 0.5 ? dᵢ : copysign(dᵢ,d[I]) # enforce sign consistency
-                V[I,i] = Vᵢ[i]
-                μ₀[I,i] = WaterLily.μ₀(dᵢ,ϵ)
-                for j ∈ 1:N
-                    μ₁[I,i,j] = WaterLily.μ₁(dᵢ,ϵ)*nᵢ[j]
-                end
-            end
-            ξ₀[I] = WaterLily.μ₀(d[I],ϵ)
-        elseif d[I]<zero(T)
-            for i ∈ 1:N
-                μ₀[I,i] = zero(T)
-            end
-            ξ₀[I] = zero(T)
-        end
-    end
-    @loop fill!(a.μ₀,a.μ₁,a.ξ₀,a.V,a.σ,I) over I ∈ inside(a.p)
-    BC!(a.μ₀,zeros(SVector{N,T}),false,a.perdir) # BC on μ₀, don't fill normal component yet
+    @invoke measure!(a::AbstractFlow,body;t,ϵ)
+    @loop (a.ξ₀[I] = WaterLily.μ₀(a.σ[I],ϵ)) over I ∈ inside(a.p)
     BC!(a.ξ₀,a.perdir)
-    BC!(a.V ,zeros(SVector{N,T}),a.exitBC,a.perdir)
 end
