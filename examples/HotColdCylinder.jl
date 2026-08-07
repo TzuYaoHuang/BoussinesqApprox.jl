@@ -25,9 +25,9 @@ sim = hot_cold_circle(128)
 # duration=8,step=0.08 covers plume formation through the steady rising plume reached around tU/L≈5
 
 # Visualize the temperature
-sim_gif!(sim; duration=40, step=0.08, field=sim->sim.flow.θ, clims=(-1,1), cfill=:seismic,
-              plotbody=true, fname=joinpath(@__DIR__,"HotColdCylinder_temp.gif"))
+sim_gif!(sim; duration=40, step=0.08, field=(dat,sim)->copyto!(dat,sim.flow.θ), clims=(-1,1), cfill=:seismic,
+              plotbody=true, video=joinpath(@__DIR__,"HotColdCylinder_temp.gif"))
 
 # Visualize the vorticity
 # sim_gif!(sim; duration=40, step=0.08, clims=(-30,30), cfill=:seismic,
-#               plotbody=true, fname=joinpath(@__DIR__,"HotColdCylinder_vort.gif"))
+#               plotbody=true, video=joinpath(@__DIR__,"HotColdCylinder_vort.gif"))
