@@ -17,7 +17,7 @@ function hot_cold_circle(N;Ra=10^6,ε=0.001,Pr=100,mem=Array,T=Float32)
     Uf = sqrt(g*α*ΔT*radius)
     U = Uf/√Pr |> T
 
-    Simulation(NN, (0,0), radius; U, Δt=0.05, ν, α, κ, flow_ctor=ThermalFlow, g=(i,x,t)-> i==2 ? -g : zero(g), perdir=(1,),θ0=nothing,θb=(x)-> -sign(x[2]-N÷2)*ΔT, body)
+    ThermalSimulation(NN, (0,0), radius; U, Δt=0.05, ν, α, κ, g=(i,x,t)-> i==2 ? -g : zero(g), perdir=(1,),θ0=nothing,θb=(x)-> -sign(x[2]-N÷2)*ΔT, body)
 end
 
 sim = hot_cold_circle(128)
