@@ -12,7 +12,7 @@ function ThermalSimulation(args...; θ0=nothing, θb=nothing, α=0.001, κ=0.1, 
     Simulation(args...; 
         flow_ctor=(flargs...;flkwargs...) -> ThermalFlow(
             flargs...; θ0, θb, α, κ, flkwargs...
-        ), kwargs
+        ), kwargs...
     )
 end
 export ThermalSimulation
