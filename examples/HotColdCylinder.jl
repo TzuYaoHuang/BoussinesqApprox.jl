@@ -20,12 +20,13 @@ function hot_cold_circle(N;Ra=10^6,ε=0.001,Pr=100,mem=Array,T=Float32)
     Simulation(NN, (0,0), radius; U, Δt=0.05, ν, α, κ, flow_ctor=ThermalFlow, g=(i,x,t)-> i==2 ? -g : zero(g), perdir=(1,),θ0=nothing,θb=(x)-> -sign(x[2]-N÷2)*ΔT, body)
 end
 
-sim = hot_cold_circle(128)
+# using CUDA
+sim = hot_cold_circle(128)#; mem=CuArray)
 
 # duration=8,step=0.08 covers plume formation through the steady rising plume reached around tU/L≈5
 
 # Visualize the temperature
-sim_gif!(sim; duration=40, step=0.08, field=(dat,sim)->copyto!(dat,sim.flow.θ), clims=(-1,1), cfill=:seismic,
+sim_gif!(sim; duration=20, step=0.08, f=(dat,sim)->copyto!(dat,sim.flow.θ), clims=(-1,1), cfill=:seismic,
               plotbody=true, video=joinpath(@__DIR__,"HotColdCylinder_temp.gif"))
 
 # Visualize the vorticity
