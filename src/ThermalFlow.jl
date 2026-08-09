@@ -2,8 +2,8 @@
 import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!,udf!,
                   BDIM!,scale_u!,exitBC!,flux_out
 
-struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:AbstractArray{T}, Lf} <: AbstractFlow{D,T}
-    flow :: Flow{D,T}
+struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
+    flow :: F
     # Thermal fields
     θ :: Sf   # Temprature field  (θ = T-T₀)
     θ⁰:: Sf   # previous temprature
@@ -18,19 +18,14 @@ struct ThermalFlow{D, T, Sf<:AbstractArray{T}, Vf<:AbstractArray{T}, Tf<:Abstrac
     κ :: T    # temperature diffusivity
     function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, θb=nothing, α=0.001, κ=0.1, kwargs...) where D
         flow = Flow(N,uBC; kwargs...)
+        T = eltype(flow.p)
         θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ)
         ξ₀ = zero(flow.σ); fill!(ξ₀,1)
-        if isa(θ0, Function)
-            apply!(θ0, θ)
-            BC!(θ,flow.perdir)
-        end
-        if isa(θb, Function)
-            apply!(θb, Λ)
-            BC!(Λ,flow.perdir)
-        end
+        isa(θ0,Function) && (apply!(θ0,θ); BC!(θ,flow.perdir))
+        isa(θb,Function) && (apply!(θb,Λ); BC!(Λ,flow.perdir))
         Ψ = zero(flow.σ)
 
-        new{D,eltype(flow.p),typeof(flow.p),typeof(flow.u),typeof(flow.μ₁),typeof(flow.λ)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
+        new{D,T,typeof(flow.p),typeof(flow)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
     end
 end
 Base.getproperty(f::ThermalFlow, s::Symbol) = s in propertynames(f) ? getfield(f, s) : getfield(f.flow, s)
