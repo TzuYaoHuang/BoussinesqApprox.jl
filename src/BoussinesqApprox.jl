@@ -3,7 +3,7 @@ module BoussinesqApprox
 using WaterLily
 import WaterLily: δ, @loop, CI, CIj, slice, inside_u,BC!
 
-include("Thermal.jl")
+include("ThermalFlow.jl")
 export ThermalFlow
 
 include("util.jl")
