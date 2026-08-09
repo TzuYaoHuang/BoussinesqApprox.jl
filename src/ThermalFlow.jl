@@ -2,6 +2,22 @@
 import WaterLily: ∂,ϕ,ϕu,ϕuL,ϕuR,ϕuP,mom_predict!,mom_correct!,conv_diff!,accelerate!, measure!,udf!,
                   BDIM!,scale_u!,exitBC!,flux_out
 
+using StaticArrays
+
+"""
+    check_sfn(f, N, T, nargs)
+
+Check a scalar field function `f` has `nargs` arguments (`f(x)` or `f(x,t)`) and returns a `T`.
+Scalar counterpart to [`check_fn`](@ref); `apply!` won't catch a wrong arity itself.
+"""
+check_sfn(f,N,T,nargs) = nothing # fallback: `nothing`, arrays, numbers are all fine
+function check_sfn(f::Function,N,T,nargs)
+    @assert first(methods(f)).nargs==nargs+1 "$f signature needs $nargs argument(s)" # +1 for the function object itself
+    @assert typeof(f(sargs(Val{nargs}(),N,T)...))==T "$f is not type stable" # catches a Float64 literal in a Float32 field
+end
+sargs(::Val{1},N,T) = (zeros(SVector{N,T}),) # f(x)
+sargs(::Val{2},N,T) = (zeros(SVector{N,T}),zero(T)) # f(x,t)
+
 struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
     flow :: F
     # Thermal fields
@@ -19,10 +35,13 @@ struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
     function ThermalFlow(N::NTuple{D}, uBC; θ0=nothing, θb=nothing, α=0.001, κ=0.1, kwargs...) where D
         flow = Flow(N,uBC; kwargs...)
         T = eltype(flow.p)
+        # check function type stability
+        check_sfn(θ0,D,T,1)          # θ0(x)
+        check_sfn(θb,D,T,2)          # θb(x,t)
         θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ)
         ξ₀ = zero(flow.σ); fill!(ξ₀,1)
         isa(θ0,Function) && (apply!(θ0,θ); BC!(θ,flow.perdir))
-        isa(θb,Function) && (apply!(θb,Λ); BC!(Λ,flow.perdir))
+        isa(θb,Function) && (apply!((x)->θb(x,zero(T)),Λ); BC!(Λ,flow.perdir))
         Ψ = zero(flow.σ)
 
         new{D,T,typeof(flow.p),typeof(flow)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
