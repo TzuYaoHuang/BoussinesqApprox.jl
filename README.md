@@ -17,7 +17,7 @@ using WaterLily, BoussinesqApprox
 ```
 The simulation struct is identical to WaterLily's, with a few extra parameters: `flow_ctor=ThermalFlow` activates the thermal simulation, `θ0` sets the initial temperature field, `θb` sets the body temperature field, `κ` is the thermal diffusivity, and `α` is the thermal expansion coefficient.
 ```julia
-Simulation(NN, (0,0), radius; U, Δt=0.05, ν, α, κ, flow_ctor=ThermalFlow, g, perdir, θ0, θb, body)
+ThermalSimulation(NN, (0,0), radius; U, Δt=0.05, ν, α, κ, g, perdir, θ0, θb, body)
 ```
 You can step or visualize the simulation exactly as you would a standard WaterLily `Simulation`:
 ```julia
