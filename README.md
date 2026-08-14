@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/TzuYaoHuang/BoussinesqApprox.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/TzuYaoHuang/BoussinesqApprox.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/TzuYaoHuang/BoussinesqApprox.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/TzuYaoHuang/BoussinesqApprox.jl)
 
-![Julia flow](assets/HotColdCylinder.gif)
+![Julia flow](assets/HotColdCylinder_temp.gif)
 
 This repository extends the [WaterLily.jl](https://github.com/WaterLily-jl/WaterLily.jl) flow solver to simulate thermal flows under the [Boussinesq approximation](https://en.wikipedia.org/wiki/Boussinesq_approximation_(buoyancy)). Immersed solid boundaries are implemented using a method similar to the first-order [Boundary Data Immersion Method](https://doi.org/10.1016/j.jcp.2011.04.022).
 
