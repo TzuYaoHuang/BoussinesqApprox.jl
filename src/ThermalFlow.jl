@@ -40,8 +40,9 @@ struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
         check_sfn(θb,D,T,2)          # θb(x,t)
         θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ)
         ξ₀ = zero(flow.σ); fill!(ξ₀,1)
+        zeroT=zero(T)
         isa(θ0,Function) && (apply!(θ0,θ); BC!(θ,flow.perdir))
-        isa(θb,Function) && (apply!((x)->θb(x,zero(T)),Λ); BC!(Λ,flow.perdir))
+        isa(θb,Function) && (apply!((x)->θb(x,zeroT),Λ); BC!(Λ,flow.perdir))
         Ψ = zero(flow.σ)
 
         new{D,T,typeof(flow.p),typeof(flow)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
