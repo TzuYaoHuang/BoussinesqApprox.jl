@@ -8,7 +8,7 @@ using StaticArrays
     check_sfn(f, N, T, nargs)
 
 Check a scalar field function `f` has `nargs` arguments (`f(x)` or `f(x,t)`) and returns a `T`.
-Scalar counterpart to [`check_fn`](@ref); `apply!` won't catch a wrong arity itself.
+Scalar counterpart to `WaterLily.check_fn`; `apply!` won't catch a wrong arity itself.
 """
 check_sfn(f,N,T,nargs) = nothing # fallback: `nothing`, arrays, numbers are all fine
 function check_sfn(f::Function,N,T,nargs)
