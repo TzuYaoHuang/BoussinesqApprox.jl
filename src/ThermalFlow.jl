@@ -18,7 +18,7 @@ end
 sargs(::Val{1},N,T) = (zeros(SVector{N,T}),) # f(x)
 sargs(::Val{2},N,T) = (zeros(SVector{N,T}),zero(T)) # f(x,t)
 
-struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
+struct ThermalFlow{D,T,Sf<:AbstractArray{T},Vf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
     flow :: F
     # Thermal fields
     θ :: Sf   # Temprature field  (θ = T-T₀)
@@ -28,6 +28,7 @@ struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
     # Body fields
     Λ :: Sf   # Body temperature field
     ξ₀:: Sf   # zeroth moment on the collocated grid
+    ξ₁:: Vf   # first  moment on the staggered  grid
 
     # Properties
     α :: T    # coefficient of thermal expansion
@@ -40,12 +41,13 @@ struct ThermalFlow{D,T,Sf<:AbstractArray{T},F<:Flow{D,T}} <: AbstractFlow{D,T}
         check_sfn(θb,D,T,2)          # θb(x,t)
         θ = zero(flow.σ); θ⁰= zero(flow.σ); Λ = zero(flow.σ)
         ξ₀ = zero(flow.σ); fill!(ξ₀,1)
+        ξ₁ = zero(flow.u); fill!(ξ₁,0)
         zeroT=zero(T)
         isa(θ0,Function) && (apply!(θ0,θ); BC!(θ,flow.perdir))
         isa(θb,Function) && (apply!((x)->θb(x,zeroT),Λ); BC!(Λ,flow.perdir))
         Ψ = zero(flow.σ)
 
-        new{D,T,typeof(flow.p),typeof(flow)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,α,κ)
+        new{D,T,typeof(flow.p),typeof(flow.u),typeof(flow)}(flow,θ,θ⁰,Ψ,Λ,ξ₀,ξ₁,α,κ)
     end
 end
 Base.getproperty(f::ThermalFlow, s::Symbol) = s in propertynames(f) ? getfield(f, s) : getfield(f.flow, s)
@@ -89,7 +91,8 @@ function BDIMΘ!(a::ThermalFlow{n,T},w=1) where {n,T} # include 0.5
     wT = T(w)
     dt = a.Δt[end]
     @loop a.Ψ[I] = a.θ⁰[I] + dt*a.Ψ[I] - a.Λ[I] over I in CartesianIndices(a.Ψ)
-    @loop a.θ[I] =(a.θ[I]  + a.Λ[I]  + a.ξ₀[I]*a.Ψ[I])*wT over I in CartesianIndices(a.Ψ)
+    @loop a.θ[I] += ξddn(I,a.ξ₁,a.Ψ) + a.Λ[I] + a.ξ₀[I]*a.Ψ[I]   over I in CartesianIndices(a.Ψ)
+    a.θ .*= wT
 end
 
 function mom_predict!(a::ThermalFlow, t₀, t₁; udf=nothing, kwargs...)
@@ -121,6 +124,27 @@ end
 
 function measure!(a::ThermalFlow{N,T},body::AbstractBody;t=zero(T),ϵ=1) where {N,T}
     @invoke measure!(a::AbstractFlow,body;t,ϵ)
-    @loop (a.ξ₀[I] = WaterLily.μ₀(a.σ[I],ϵ)) over I ∈ inside(a.p)
+    a.ξ₀ .= one(T); a.ξ₁ .= zero(T); d²=T(2+ϵ)^2
+    @fastmath @inline function fill!(ξ₀,ξ₁,dd,I)
+        d = dd[I]
+        if d^2<d²
+            ξ₀[I] = WaterLily.μ₀(d,ϵ)
+            _,nᵢ,_ = measure(body,loc(0,I,T),t,fastd²=d²)
+            for i ∈ 1:N
+                ξ₁[I,i] = WaterLily.μ₁(d,ϵ)*nᵢ[i]
+            end
+        elseif d<zero(T)
+            ξ₀[I] = zero(T)
+        end
+    end
+    @loop fill!(a.ξ₀,a.ξ₁,a.σ,I) over I ∈ inside(a.p)
     BC!(a.ξ₀,a.perdir)
+end
+
+@fastmath @inline function ξddn(I::CartesianIndex{n},μ,f) where n
+    s = zero(eltype(f))
+    for j ∈ 1:n
+        s+= @inbounds μ[I,j]*(f[I+δ(j,I)]-f[I-δ(j,I)])
+    end
+    return s/2
 end
