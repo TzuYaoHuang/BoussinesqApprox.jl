@@ -24,3 +24,17 @@ You can step or visualize the simulation exactly as you would a standard WaterLi
 sim_step!(sim, t_end; remeasure::Bool)
 ```
 See the `examples` folder for more examples of how to run simulations. The hot/cold cylinder simulation shown in the GIF above can be found in [examples/HotColdCylinder.jl](examples/HotColdCylinder.jl).
+
+### Installation
+
+Neither BoussinesqApprox.jl nor the `sim_gif!` field-plotting used in the examples (e.g. `f=(dat,sim)->copyto!(dat,sim.flow.θ)` to plot the temperature field) are available in a released version of WaterLily.jl yet. Until they land upstream, install WaterLily.jl from the [`feature/more-field-simgif`](https://github.com/TzuYaoHuang/WaterLily.jl/tree/feature/more-field-simgif) branch of the fork before adding this package:
+```julia
+using Pkg
+Pkg.add(url="https://github.com/TzuYaoHuang/WaterLily.jl", rev="feature/more-field-simgif")
+Pkg.add(url="https://github.com/TzuYaoHuang/BoussinesqApprox.jl")
+```
+or from the Pkg REPL:
+```
+pkg> add https://github.com/TzuYaoHuang/WaterLily.jl#feature/more-field-simgif
+pkg> add https://github.com/TzuYaoHuang/BoussinesqApprox.jl
+```
