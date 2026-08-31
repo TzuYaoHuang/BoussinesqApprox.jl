@@ -141,10 +141,10 @@ function measure!(a::ThermalFlow{N,T},body::AbstractBody;t=zero(T),ϵ=1) where {
     BC!(a.ξ₀,a.perdir)
 end
 
-@fastmath @inline function ξddn(I::CartesianIndex{n},μ,f) where n
+@fastmath @inline function ξddn(I::CartesianIndex{n},ξ₁,f) where n
     s = zero(eltype(f))
     for j ∈ 1:n
-        s+= @inbounds μ[I,j]*(f[I+δ(j,I)]-f[I-δ(j,I)])
+        s+= @inbounds ξ₁[I,j]*(f[I+δ(j,I)]-f[I-δ(j,I)])
     end
     return s/2
 end
