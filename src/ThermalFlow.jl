@@ -91,7 +91,7 @@ function BDIMΘ!(a::ThermalFlow{n,T},w=1) where {n,T} # include 0.5
     wT = T(w)
     dt = a.Δt[end]
     @loop a.Ψ[I] = a.θ⁰[I] + dt*a.Ψ[I] - a.Λ[I] over I in CartesianIndices(a.Ψ)
-    @loop a.θ[I] += ξddn(I,a.ξ₁,a.Ψ) + a.Λ[I] + a.ξ₀[I]*a.Ψ[I]   over I in CartesianIndices(a.Ψ)
+    @loop a.θ[I] += ξddn(I,a.ξ₁,a.Ψ) + a.Λ[I] + a.ξ₀[I]*a.Ψ[I] over I in inside(a.Ψ)
     a.θ .*= wT
 end
 
