@@ -5,9 +5,9 @@ using Plots
 # Isothermal cylinder held at ΔT above the ambient, in a uniform cross flow.
 # No buoyancy (g=nothing) -- this is a forced-convection validation case.
 function heated_circle(N=64;Re=100,Pr=0.7,U=1,mem=Array,T=Float32)
-    NN = (3N,2N)
-    radius = N÷4
-    center = N
+    NN = (2N,N)
+    radius = N/20 |> T
+    center = N÷2
     body = AutoBody((x,t)->√sum(abs2, x .- center) - radius)
     oneT = one(T)
 
@@ -22,14 +22,14 @@ Nu_churchill_bernstein(Re,Pr) = 0.3 + 0.62*√Re*Pr^(1/3)/(1+(0.4/Pr)^(2/3))^(1/
 
 # Advance the sim in `step`-sized chunks up to `dur`, recording the total heat flux and
 # animating the temperature field; discard the initial transient before averaging
-function mean_Nu(sim;dur=60,step=0.2,transient=20,video=joinpath(@__DIR__,"HeatedCylinderCrossFlow_temp.gif"))
+function mean_Nu(sim;dur=100,step=0.2,transient=50,video=joinpath(@__DIR__,"HeatedCylinderCrossFlow_temp.gif"))
     t₀ = sim_time(sim)
     ts = Float64[]; Nu = Float64[]
     anim = @animate for tᵢ in range(t₀,t₀+dur;step)
         sim_step!(sim,tᵢ;remeasure=false)
         push!(ts, tᵢ)
         push!(Nu, heat_flux(sim)/(π*sim.flow.κ)) # ΔT=1, D=2radius, Nu=Q/(π*κ*ΔT)
-        flood(sim.flow.θ[inside(sim.flow.p)]; clims=(0,1), cfill=:thermal, hidedecorations=true)
+        flood(sim.flow.θ[inside(sim.flow.p)]; clims=(-0.01,1), cfill=:thermal, hidedecorations=true)
         body_plot!(sim)
         println("tU/L=",round(tᵢ,digits=3)," Nu=",round(Nu[end],digits=3))
     end
@@ -39,10 +39,10 @@ function mean_Nu(sim;dur=60,step=0.2,transient=20,video=joinpath(@__DIR__,"Heate
 end
 
 using CUDA
-Re,Pr = 100,0.7
-sim = heated_circle(;Re,Pr,mem=CuArray)
+Re,Pr = 500,0.71
+sim = heated_circle(512;Re,Pr,mem=CuArray)
 
-ts, Nu, Nu_sim = mean_Nu(sim; dur=60, step=0.2, transient=20)
+ts, Nu, Nu_sim = mean_Nu(sim)
 Nu_ref = Nu_churchill_bernstein(Re,Pr)
 @info "Nu (simulation, time-averaged) = $(round(Nu_sim,digits=2))"
 @info "Nu (Churchill-Bernstein)       = $(round(Nu_ref,digits=2))"
