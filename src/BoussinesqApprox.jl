@@ -6,6 +6,9 @@ import WaterLily: δ, @loop, CI, CIj, slice, inside_u,BC!
 include("ThermalFlow.jl")
 export ThermalFlow
 
+include("Metrics.jl")
+export heat_flux
+
 include("util.jl")
 
 function ThermalSimulation(args...; θ0=nothing, θb=nothing, α=0.001, κ=0.1, kwargs...)
